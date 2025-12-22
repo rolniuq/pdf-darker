@@ -8,7 +8,9 @@ def invert_image(image: Image.Image) -> Image.Image:
     return ImageOps.invert(image.convert("RGB"))
 
 
-def convert_pdf_to_dark(input_pdf: str, output_pdf: str, dpi: int = 300, verbose: bool = True):
+def convert_pdf_to_dark(
+    input_pdf: str, output_pdf: str, dpi: int = 300, verbose: bool = True
+):
     """Convert a PDF from light mode to dark mode."""
     if verbose:
         print(f"Converting {input_pdf} to dark mode...")
