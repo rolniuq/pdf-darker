@@ -1,38 +1,14 @@
-from pdf2image import convert_from_path
-from PIL import ImageOps, Image
+#!/usr/bin/env python3
+"""Legacy dark mode converter - preserved for backward compatibility."""
+
 import sys
+from pathlib import Path
 
+# Add src directory to Python path
+src_path = Path(__file__).parent / "src"
+sys.path.insert(0, str(src_path))
 
-def invert_image(image: Image.Image) -> Image.Image:
-    """Invert colors of an image."""
-    return ImageOps.invert(image.convert("RGB"))
-
-
-def convert_pdf_to_dark(
-    input_pdf: str, output_pdf: str, dpi: int = 300, verbose: bool = True
-):
-    """Convert a PDF from light mode to dark mode."""
-    if verbose:
-        print(f"Converting {input_pdf} to dark mode...")
-
-    # Convert PDF pages to images (higher DPI = sharper text)
-    pages = convert_from_path(input_pdf, dpi=dpi)
-
-    # Invert colors for each page
-    inverted_pages = []
-    for i, page in enumerate(pages):
-        if verbose:
-            print(f"Processing page {i + 1}/{len(pages)}...")
-        inverted = invert_image(page)
-        inverted_pages.append(inverted)
-
-    # Save as PDF
-    inverted_pages[0].save(output_pdf, save_all=True, append_images=inverted_pages[1:])
-    if verbose:
-        print(f"Done! Dark PDF saved to: {output_pdf}")
-
-    return inverted_pages
-
+from pdf_editor.operations.dark_mode_legacy import convert_pdf_to_dark
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
