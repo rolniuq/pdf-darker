@@ -24,13 +24,16 @@ from ..operations.image_operations import (
     ReplaceImageOperation
 )
 from ..operations.form_operations import (
-    CreateFormFieldOperation, FillFormFieldOperation
+    CreateFormFieldOperation, FillFormFieldOperation,
+    ValidateFormOperation, ExportFormDataOperation
 )
 from ..operations.annotation_operations import (
-    AddAnnotationOperation
+    AddAnnotationOperation, AddCommentOperation,
+    AddDrawingOperation, AddFreehandOperation
 )
 from ..operations.security_operations import (
-    SetPasswordOperation, EditMetadataOperation
+    SetPasswordOperation, AddSignatureOperation,
+    EditMetadataOperation, AddSecurityWatermarkOperation, ExportMetadataOperation
 )
 from ..operations.dark_mode import DarkModeOperation
 from ..config.manager import config_manager
@@ -60,30 +63,10 @@ def handle_cli_errors(func):
     return wrapper
 
 
-@click.group()
-@click.option('--config', '-c', type=click.Path(exists=True), help='Configuration file path')
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
-@click.option('--log-file', type=click.Path(), help='Log file path')
-@click.pass_context
-def cli(ctx, config: Optional[str], verbose: bool, log_file: Optional[str]):
-    """PDF Editor - A comprehensive PDF editing tool."""
-    
-    # Setup logging
-    if verbose:
-        setup_logging(level="DEBUG", log_file=log_file)
-    elif log_file:
-        setup_logging(level="INFO", log_file=log_file)
-    
-    # Initialize context
-    ctx.ensure_object(dict)
-    ctx.obj['editor'] = PDFEditor(config_file=config)
-    ctx.obj['verbose'] = verbose
-
-
 @cli.command()
 @click.argument('input_file', type=click.Path(exists=True))
 @click.argument('output_file', type=click.Path())
-@click.option('--dpi', type=int, default=300, help='DPI for image conversion (higher = sharper text)')
+@click.option('--dpi', type=int, default=300, help='DPI for conversion (higher = sharper text)')
 @click.option('--quality', type=int, default=95, help='JPEG quality (1-100)')
 @click.option('--preserve-text/--no-preserve-text', default=True, help='Preserve text layer and links (default: True)')
 @click.option('--legacy', is_flag=True, help='Use legacy image-based conversion (loses text layer)')
@@ -110,7 +93,7 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, pr
     
     editor = ctx.obj['editor']
     
-    with console.status("[bold green]Converting PDF to dark mode..."):
+    with console.status("[bold green]Converting PDF to enhanced dark mode..."):
         # Load document
         editor.load_document(input_file)
         
@@ -132,7 +115,7 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, pr
             TextColumn("[progress.description]{task.description}"),
             console=console
         ) as progress:
-            task = progress.add_task("Converting to dark mode...", total=None)
+            task = progress.add_task("Converting to enhanced dark mode...", total=None)
             
             editor.execute_operations()
             progress.update(task, description="Saving document...")
@@ -141,273 +124,16 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, pr
             editor.save_document(output_file)
     
     # Show results
+    mode_text = "Enhanced (text preserved)" if not legacy else "Legacy (image-based)"
     console.print(Panel.fit(
-        f"[green]✓[/green] Successfully converted to dark mode\n"
-        f"[blue]Input:[/blue] {input_file}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Dark Mode Conversion Complete"
-    ))
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--angle', '-a', type=click.Choice(['90', '180', '270']), required=True, help='Rotation angle')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def rotate(ctx, input_file: str, output_file: str, page: int, angle: str, force: bool):
-    """Rotate a PDF page."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Rotating page {page} by {angle} degrees..."):
-        editor.load_document(input_file)
-        
-        operation = RotatePageOperation(page, int(angle))
-        editor.add_operation(operation)
-        
-        editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully rotated page {page}\n"
-        f"[blue]Angle:[/blue] {angle}°\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Page Rotation Complete"
-    ))
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.pass_context
-@handle_cli_errors
-def info(ctx, input_file: str):
-    """Display information about a PDF file."""
-    
-    editor = ctx.obj['editor']
-    editor.load_document(input_file)
-    
-    info_data = editor.get_document_info()
-    
-    # Create info table
-    table = Table(title="PDF Information")
-    table.add_column("Property", style="cyan")
-    table.add_column("Value", style="white")
-    
-    table.add_row("File Path", str(info_data['file_path']))
-    table.add_row("Page Count", str(info_data['page_count']))
-    table.add_row("File Size", f"{info_data['metadata'].get('file_size', 0):,} bytes")
-    table.add_row("Title", info_data['metadata'].get('title', 'N/A'))
-    table.add_row("Author", info_data['metadata'].get('author', 'N/A'))
-    table.add_row("Creator", info_data['metadata'].get('creator', 'N/A'))
-    table.add_row("Modified", info_data['metadata'].get('modified_time', 'N/A'))
-    
-    console.print(table)
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--text', '-t', required=True, help='Text to add')
-@click.option('--x', type=float, required=True, help='X coordinate')
-@click.option('--y', type=float, required=True, help='Y coordinate')
-@click.option('--font', default='helv', help='Font name')
-@click.option('--size', type=float, default=11, help='Font size')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def add_text(ctx, input_file: str, output_file: str, page: int, text: str, 
-             x: float, y: float, font: str, size: float, force: bool):
-    """Add text to a PDF page."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Adding text to page {page}..."):
-        editor.load_document(input_file)
-        
-        operation = AddTextOperation(page, text, (x, y), fontname=font, fontsize=size)
-        editor.add_operation(operation)
-        
-        editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully added text\n"
-        f"[blue]Page:[/blue] {page}\n"
-        f"[blue]Text:[/blue] {text}\n"
-        f"[blue]Position:[/blue] ({x}, {y})\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Add Text Complete"
-    ))
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--pages', '-p', help='Pages to delete (comma-separated, e.g., "0,2,5")')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def delete_pages(ctx, input_file: str, output_file: str, pages: str, force: bool):
-    """Delete pages from a PDF."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    if not pages:
-        console.print("[red]Error: --pages option is required[/red]")
-        sys.exit(1)
-    
-    # Parse page numbers
-    try:
-        page_list = [int(p.strip()) for p in pages.split(',')]
-    except ValueError:
-        console.print("[red]Error: Invalid page numbers[/red]")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    editor.load_document(input_file)
-    
-    # Validate page numbers
-    for page_num in page_list:
-        if page_num < 0 or page_num >= editor.document.page_count:
-            console.print(f"[red]Error: Page number {page_num} out of range[/red]")
-            sys.exit(1)
-    
-    with console.status(f"[bold green]Deleting pages {page_list}..."):
-        # Sort in descending order to avoid index shifting
-        page_list.sort(reverse=True)
-        
-        for page_num in page_list:
-            operation = DeletePageOperation(page_num)
-            editor.add_operation(operation)
-        
-        editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully deleted pages\n"
-        f"[blue]Pages:[/blue] {page_list}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Delete Pages Complete"
-    ))
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--image', '-i', type=click.Path(exists=True), required=True, help='Image file path')
-@click.option('--x', type=float, required=True, help='X coordinate')
-@click.option('--y', type=float, required=True, help='Y coordinate')
-@click.option('--width', type=float, help='Image width (optional)')
-@click.option('--height', type=float, help='Image height (optional)')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def add_image(ctx, input_file: str, output_file: str, page: int, image: str, 
-              x: float, y: float, width: float, height: float, force: bool):
-    """Add an image to a PDF page."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    if not Path(image).exists():
-        console.print(f"[red]Error: Image file not found: {image}[/red]")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Adding image to page {page}..."):
-        editor.load_document(input_file)
-        
-        # Prepare dimensions
-        dimensions = None
-        if width and height:
-            dimensions = (width, height)
-        elif width or height:
-            console.print("[red]Error: Both --width and --height must be provided together[/red]")
-            sys.exit(1)
-        
-        operation = AddImageOperation(page, image, (x, y), dimensions)
-        editor.add_operation(operation)
-        
-        editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully added image\n"
-        f"[blue]Page:[/blue] {page}\n"
-        f"[blue]Image:[/blue] {image}\n"
-        f"[blue]Position:[/blue] ({x}, {y})\n"
-        f"[blue]Dimensions:[/blue] {dimensions or 'original'}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Add Image Complete"
-    ))
-
-
-@cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--index', '-i', type=int, required=True, help='Image index (0-based)')
-@click.option('--new-image', type=click.Path(exists=True), required=True, help='New image file path')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def replace_image(ctx, input_file: str, output_file: str, page: int, index: int, 
-                 new_image: str, force: bool):
-    """Replace an existing image in a PDF page."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    if not Path(new_image).exists():
-        console.print(f"[red]Error: New image file not found: {new_image}[/red]")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Replacing image {index} on page {page}..."):
-        editor.load_document(input_file)
-        
-        operation = ReplaceImageOperation(page, index, new_image)
-        editor.add_operation(operation)
-        
-        editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully replaced image\n"
-        f"[blue]Page:[/blue] {page}\n"
-        f"[blue]Image index:[/blue] {index}\n"
-        f"[blue]New image:[/blue] {new_image}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Replace Image Complete"
+        f"[green]✓[/green] Successfully converted to {mode_text} dark mode\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}\\n"
+        f"[blue]Mode:[/blue] {mode_text}\\n"
+        f"[blue]Text Layer:[/blue] {'Preserved ✓' if not legacy else 'Lost ✗'}\\n"
+        f"[blue]Links:[/blue] {'Active ✓' if not legacy else 'Lost ✗'}\\n"
+        f"[blue]Forms:[/blue] {'Functional ✓' if not legacy else 'Lost ✗'}",
+        title="Dark Mode Conversion"
     ))
 
 
@@ -470,7 +196,6 @@ def fill_field(ctx, page: int, data: str, input_file: str, output_file: str):
     
     # Parse field data
     try:
-        import json
         field_data = json.loads(data)
     except json.JSONDecodeError:
         console.print("[red]Error: Invalid JSON format for field data[/red]")
@@ -565,7 +290,6 @@ def set_password(ctx, user_password: str, owner_password: str, encryption: str, 
     perms = {}
     if permissions:
         try:
-            import json
             perms = json.loads(permissions)
         except json.JSONDecodeError:
             console.print("[red]Error: Invalid JSON format for permissions[/red]")
@@ -641,80 +365,6 @@ def edit_metadata(ctx, title: str, author: str, subject: str, keywords: str, cre
 
 
 @cli.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--dpi', type=int, default=300, help='DPI for image conversion (higher = sharper text)')
-@click.option('--quality', type=int, default=95, help='JPEG quality (1-100)')
-@click.option('--preserve-text/--no-preserve-text', default=True, help='Preserve text layer and links (default: True)')
-@click.option('--legacy', is_flag=True, help='Use legacy image-based conversion (loses text layer)')
-@click.option('--verbose', '-v', is_flag=True, default=True, help='Show detailed progress')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, preserve_text: bool, legacy: bool, verbose: bool, force: bool):
-    """Convert PDF to dark mode (black background, white text) with text preservation."""
-    
-    # Display mode information
-    if not legacy and preserve_text:
-        console.print("[green]✅ Enhanced Dark Mode[/green]: Preserves text layer, links, and form fields")
-    elif legacy:
-        console.print("[yellow]⚠️  Legacy Dark Mode[/yellow]: Converts to images (text layer lost)")
-    else:
-        console.print("[yellow]⚠️  Image-based Dark Mode[/yellow]: Text layer and links will be lost")
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status("[bold green]Converting PDF to enhanced dark mode..."):
-        # Load document
-        editor.load_document(input_file)
-        
-        # Add dark mode operation
-        operation = DarkModeOperation(
-            dpi=dpi, 
-            quality=quality, 
-            verbose=verbose,
-            preserve_text=preserve_text and not legacy,
-            preserve_forms=preserve_text and not legacy,
-            preserve_links=preserve_text and not legacy,
-            use_enhanced=not legacy
-        )
-        editor.add_operation(operation)
-        
-        # Execute operations
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Converting to enhanced dark mode...", total=None)
-            
-            editor.execute_operations()
-            progress.update(task, description="Saving document...")
-            
-            # Save document
-            editor.save_document(output_file)
-    
-    # Show results
-    mode_text = "Enhanced (text preserved)" if not legacy else "Legacy (image-based)"
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully converted to {mode_text} dark mode\\n"
-        f"[blue]Input:[/blue] {input_file}\\n"
-        f"[blue]Output:[/blue] {output_file}\\n"
-        f"[blue]Mode:[/blue] {mode_text}\\n"
-        f"[blue]Text Layer:[/blue] {'Preserved ✓' if not legacy else 'Lost ✗'}\\n"
-        f"[blue]Links:[/blue] {'Active ✓' if not legacy else 'Lost ✗'}\\n"
-        f"[blue]Forms:[/blue] {'Functional ✓' if not legacy else 'Lost ✗'}",
-        title="Dark Mode Conversion"
-    ))
-
-
-@cli.command()
 @click.argument('input_file')
 @click.argument('output_file')
 @click.pass_context
@@ -762,16 +412,37 @@ def config_set(ctx, key: str, value: str):
         sys.exit(1)
 
 
+@cli.command()
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def wrapper(ctx, input_file: str, output_file: str):
+    """Wrapper operation for basic PDF operations."""
+    
+    editor = ctx.obj['editor']
+    
+    with console.status("[bold green]Processing document..."):
+        editor.load_document(input_file)
+        
+        # For now, this is a placeholder for additional operations
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Document processed\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Document Processed"
+    ))
 
 
-
-
-
-
-
-
-
-
+@cli.command()
+@click.pass_context
+def cli(ctx):
+    """PDF Editor CLI."""
+    # Initialize context
+    ctx.ensure_object(dict)
+    ctx.obj['editor'] = PDFEditor(config_file=config)
+    ctx.obj['verbose'] = verbose if 'verbose' in ctx.params else True
 
 
 if __name__ == '__main__':
