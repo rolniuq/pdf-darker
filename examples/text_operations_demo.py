@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pdf_editor.core.document import PDFDocument
-from pdf_editor.core.manager import OperationManager
+from pdf_editor.core.base import OperationManager
 from pdf_editor.operations.text_operations import (
     AddTextOperation, 
     HighlightTextOperation, 

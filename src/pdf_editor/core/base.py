@@ -24,21 +24,28 @@ class OperationType(Enum):
     MERGE_PAGES = "merge_pages"
     SPLIT_PAGES = "split_pages"
     
-    # Image operations
+# Image operations
     ADD_IMAGE = "add_image"
     REPLACE_IMAGE = "replace_image"
     DELETE_IMAGE = "delete_image"
-    CROP_IMAGE = "crop_image"
+    
+    # Form operations
+    CREATE_FIELD = "create_field"
+    FILL_FIELD = "fill_field"
+    VALIDATE_FORM = "validate_form"
+    EXPORT_FORM_DATA = "export_form_data"
     
     # Annotation operations
     ADD_ANNOTATION = "add_annotation"
-    DELETE_ANNOTATION = "delete_annotation"
+    ADD_COMMENT = "add_comment"
+    ADD_DRAWING = "add_drawing"
+    ADD_FREEHAND = "add_freehand"
     
-    # Document operations
-    COMPRESS = "compress"
-    ENCRYPT = "encrypt"
-    DECRYPT = "decrypt"
-    ADD_WATERMARK = "add_watermark"
+    # Security operations
+    SET_PASSWORD = "set_password"
+    ADD_SIGNATURE = "add_signature"
+    EDIT_METADATA = "edit_metadata"
+    ADD_SECURITY_WATERMARK = "add_security_watermark"
     
     # Special operations
     DARK_MODE = "dark_mode"

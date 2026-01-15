@@ -1,13 +1,12 @@
 """Image manipulation operations."""
 
-from abc import abstractmethod
-from typing import Any, Dict, Union
+from typing import Union
 from pathlib import Path
 import fitz
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 
-from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument, PDFException
+from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument
 
 
 class ImageOperation(BaseOperation):
@@ -135,7 +134,6 @@ class ReplaceImageOperation(ImageOperation):
                 self.logger.error(f"Image index {image_index} out of range")
                 return OperationResult.FAILED
             
-            old_image = images[image_index]
             
             # This is a simplified implementation
             # In practice, you'd need more sophisticated image replacement
@@ -439,7 +437,6 @@ class AddWatermarkOperation(ImageOperation):
         watermark_text = self.get_parameter("watermark_text")
         font_size = self.get_parameter("font_size")
         opacity = self.get_parameter("opacity")
-        rotation = self.get_parameter("rotation")
         color = self.get_parameter("color")
         position = self.get_parameter("position")
         
@@ -576,7 +573,6 @@ class AddImageWatermarkOperation(ImageOperation):
         try:
             watermark_image_path = self.get_parameter("watermark_image_path")
             page_numbers = self.get_parameter("page_numbers")
-            opacity = self.get_parameter("opacity")
             scale = self.get_parameter("scale")
             position = self.get_parameter("position")
             

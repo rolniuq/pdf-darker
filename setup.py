@@ -32,8 +32,8 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "darker-pdf=src.pdf_editor.cli.main:cli",
-            "pdf-editor=src.pdf_editor.cli.main:cli",
+            "darker-pdf=pdf_editor.cli.main:cli",
+            "pdf-editor=pdf_editor.cli.main:cli",
         ],
     },
     extras_require={

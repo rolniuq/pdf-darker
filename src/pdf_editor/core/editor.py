@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .base import (
     PDFDocument, OperationManager, PluginManager,
-    BaseOperation, OperationResult, PDFException
+    BaseOperation, PDFException
 )
 from ..config.manager import config_manager
 from ..utils.logging import get_logger
@@ -115,7 +115,6 @@ class PDFEditor:
         if not self.current_document:
             raise PDFException("No document loaded")
         
-        results = self.operation_manager.execute_operations(self.current_document)
         summary = self.operation_manager.get_results_summary()
         
         self.logger.info(f"Operations completed: {summary['successful']}/{summary['total']} successful")

@@ -1,10 +1,9 @@
 """Page manipulation operations."""
 
-from abc import abstractmethod
-from typing import Any, Dict, List, Union
+from typing import List
 import fitz
 
-from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument, PDFException
+from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument
 
 
 class PageOperation(BaseOperation):
@@ -324,7 +323,6 @@ class MergeDocumentsOperation(PageOperation):
         """Execute merge documents operation."""
         try:
             source_documents = self.get_parameter("source_documents")
-            output_path = self.get_parameter("output_path")
             insert_position = self.get_parameter("insert_position")
             
             if insert_position is None:

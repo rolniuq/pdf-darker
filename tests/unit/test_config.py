@@ -2,7 +2,6 @@
 
 import pytest
 import yaml
-from pathlib import Path
 
 from src.pdf_editor.config.manager import ConfigManager, PDFConfig
 

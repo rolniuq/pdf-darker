@@ -1,8 +1,6 @@
 """Logging system for PDF Editor."""
 
 import logging
-import os
-import sys
 from pathlib import Path
 from typing import Optional
 from rich.logging import RichHandler

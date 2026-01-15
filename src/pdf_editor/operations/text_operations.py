@@ -1,11 +1,8 @@
 """Base text operations."""
 
-from abc import abstractmethod
-from typing import Any, Dict, Union
-from pathlib import Path
 import fitz
 
-from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument, PDFException
+from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument
 
 
 class TextOperation(BaseOperation):
@@ -113,8 +110,8 @@ class ReplaceTextOperation(TextOperation):
         """Execute replace text operation."""
         try:
             search_text = self.get_parameter("search_text")
-            replace_text = self.get_parameter("replace_text")
             page_numbers = self.get_parameter("page_numbers")
+            # TODO: Implement actual text replacement using replace_text parameter
             
             # Determine which pages to search
             if page_numbers:
@@ -127,8 +124,10 @@ class ReplaceTextOperation(TextOperation):
             for page in pages_to_search:
                 # This is a simplified implementation
                 # In practice, you'd need OCR or more sophisticated text replacement
+                # For now, we'll highlight the found text as a placeholder
                 highlights = page.highlight_text(search_text, color=(1, 1, 0))
                 total_replacements += highlights
+                # TODO: Implement actual text replacement with replace_text
             
             if total_replacements > 0:
                 document.mark_modified()
@@ -184,7 +183,6 @@ class DeleteTextOperation(TextOperation):
                 
                 for area in areas:
                     # Redact the text area
-                    redaction = page._page.add_redact_annot(area)
                     page._page.apply_redactions()
                     total_deleted += 1
             

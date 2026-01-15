@@ -2,40 +2,35 @@
 
 import click
 import sys
+import json
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich import print as rprint
 
 from ..core.editor import PDFEditor
 from ..operations.text_operations import (
-    AddTextOperation,
-    HighlightTextOperation,
-    AddAnnotationOperation,
-    AddTextBoxOperation,
-    ReplaceTextOperation,
-    DeleteTextOperation
+    AddTextOperation
 )
 from ..operations.page_operations import (
     RotatePageOperation,
-    DeletePageOperation,
-    ReorderPagesOperation,
-    InsertPageOperation,
-    ExtractPagesOperation,
-    MergeDocumentsOperation,
-    SplitDocumentOperation
+    DeletePageOperation
 )
 from ..operations.image_operations import (
     AddImageOperation,
-    ResizeImageOperation,
-    CropImageOperation,
-    ImageFilterOperation,
-    AddWatermarkOperation,
-    AddImageWatermarkOperation
+    ReplaceImageOperation
+)
+from ..operations.form_operations import (
+    CreateFormFieldOperation, FillFormFieldOperation
+)
+from ..operations.annotation_operations import (
+    AddAnnotationOperation
+)
+from ..operations.security_operations import (
+    SetPasswordOperation, EditMetadataOperation
 )
 from ..operations.dark_mode import DarkModeOperation
 from ..config.manager import config_manager
@@ -90,12 +85,22 @@ def cli(ctx, config: Optional[str], verbose: bool, log_file: Optional[str]):
 @click.argument('output_file', type=click.Path())
 @click.option('--dpi', type=int, default=300, help='DPI for image conversion (higher = sharper text)')
 @click.option('--quality', type=int, default=95, help='JPEG quality (1-100)')
+@click.option('--preserve-text/--no-preserve-text', default=True, help='Preserve text layer and links (default: True)')
+@click.option('--legacy', is_flag=True, help='Use legacy image-based conversion (loses text layer)')
 @click.option('--verbose', '-v', is_flag=True, default=True, help='Show detailed progress')
 @click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
 @click.pass_context
 @handle_cli_errors
-def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, verbose: bool, force: bool):
-    """Convert PDF to dark mode (black background, white text)."""
+def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, preserve_text: bool, legacy: bool, verbose: bool, force: bool):
+    """Convert PDF to dark mode (black background, white text) with text preservation."""
+    
+    # Display mode information
+    if not legacy and preserve_text:
+        console.print("[green]✅ Enhanced Dark Mode[/green]: Preserves text layer, links, and form fields")
+    elif legacy:
+        console.print("[yellow]⚠️  Legacy Dark Mode[/yellow]: Converts to images (text layer lost)")
+    else:
+        console.print("[yellow]⚠️  Image-based Dark Mode[/yellow]: Text layer and links will be lost")
     
     output_path = Path(output_file)
     if output_path.exists() and not force:
@@ -104,14 +109,21 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, ve
         sys.exit(1)
     
     editor = ctx.obj['editor']
-    verbose = ctx.obj['verbose']
     
     with console.status("[bold green]Converting PDF to dark mode..."):
         # Load document
-        document = editor.load_document(input_file)
+        editor.load_document(input_file)
         
         # Add dark mode operation
-        operation = DarkModeOperation(dpi=dpi, quality=quality, verbose=verbose)
+        operation = DarkModeOperation(
+            dpi=dpi, 
+            quality=quality, 
+            verbose=verbose,
+            preserve_text=preserve_text and not legacy,
+            preserve_forms=preserve_text and not legacy,
+            preserve_links=preserve_text and not legacy,
+            use_enhanced=not legacy
+        )
         editor.add_operation(operation)
         
         # Execute operations
@@ -122,7 +134,7 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, ve
         ) as progress:
             task = progress.add_task("Converting to dark mode...", total=None)
             
-            results = editor.execute_operations()
+            editor.execute_operations()
             progress.update(task, description="Saving document...")
             
             # Save document
@@ -132,8 +144,7 @@ def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, ve
     console.print(Panel.fit(
         f"[green]✓[/green] Successfully converted to dark mode\n"
         f"[blue]Input:[/blue] {input_file}\n"
-        f"[blue]Output:[/blue] {output_file}\n"
-        f"[blue]Operations:[/blue] {results['successful']}/{results['total']} successful",
+        f"[blue]Output:[/blue] {output_file}",
         title="Dark Mode Conversion Complete"
     ))
 
@@ -158,12 +169,12 @@ def rotate(ctx, input_file: str, output_file: str, page: int, angle: str, force:
     editor = ctx.obj['editor']
     
     with console.status(f"[bold green]Rotating page {page} by {angle} degrees..."):
-        document = editor.load_document(input_file)
+        editor.load_document(input_file)
         
         operation = RotatePageOperation(page, int(angle))
         editor.add_operation(operation)
         
-        results = editor.execute_operations()
+        editor.execute_operations()
         editor.save_document(output_file)
     
     console.print(Panel.fit(
@@ -182,7 +193,7 @@ def info(ctx, input_file: str):
     """Display information about a PDF file."""
     
     editor = ctx.obj['editor']
-    document = editor.load_document(input_file)
+    editor.load_document(input_file)
     
     info_data = editor.get_document_info()
     
@@ -227,12 +238,12 @@ def add_text(ctx, input_file: str, output_file: str, page: int, text: str,
     editor = ctx.obj['editor']
     
     with console.status(f"[bold green]Adding text to page {page}..."):
-        document = editor.load_document(input_file)
+        editor.load_document(input_file)
         
         operation = AddTextOperation(page, text, (x, y), fontname=font, fontsize=size)
         editor.add_operation(operation)
         
-        results = editor.execute_operations()
+        editor.execute_operations()
         editor.save_document(output_file)
     
     console.print(Panel.fit(
@@ -273,11 +284,11 @@ def delete_pages(ctx, input_file: str, output_file: str, pages: str, force: bool
         sys.exit(1)
     
     editor = ctx.obj['editor']
-    document = editor.load_document(input_file)
+    editor.load_document(input_file)
     
     # Validate page numbers
     for page_num in page_list:
-        if page_num < 0 or page_num >= document.page_count:
+        if page_num < 0 or page_num >= editor.document.page_count:
             console.print(f"[red]Error: Page number {page_num} out of range[/red]")
             sys.exit(1)
     
@@ -289,7 +300,7 @@ def delete_pages(ctx, input_file: str, output_file: str, pages: str, force: bool
             operation = DeletePageOperation(page_num)
             editor.add_operation(operation)
         
-        results = editor.execute_operations()
+        editor.execute_operations()
         editor.save_document(output_file)
     
     console.print(Panel.fit(
@@ -301,6 +312,411 @@ def delete_pages(ctx, input_file: str, output_file: str, pages: str, force: bool
 
 
 @cli.command()
+@click.argument('input_file', type=click.Path(exists=True))
+@click.argument('output_file', type=click.Path())
+@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
+@click.option('--image', '-i', type=click.Path(exists=True), required=True, help='Image file path')
+@click.option('--x', type=float, required=True, help='X coordinate')
+@click.option('--y', type=float, required=True, help='Y coordinate')
+@click.option('--width', type=float, help='Image width (optional)')
+@click.option('--height', type=float, help='Image height (optional)')
+@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
+@click.pass_context
+@handle_cli_errors
+def add_image(ctx, input_file: str, output_file: str, page: int, image: str, 
+              x: float, y: float, width: float, height: float, force: bool):
+    """Add an image to a PDF page."""
+    
+    output_path = Path(output_file)
+    if output_path.exists() and not force:
+        console.print(f"[red]Output file already exists: {output_file}[/red]")
+        console.print("Use --force to overwrite")
+        sys.exit(1)
+    
+    if not Path(image).exists():
+        console.print(f"[red]Error: Image file not found: {image}[/red]")
+        sys.exit(1)
+    
+    editor = ctx.obj['editor']
+    
+    with console.status(f"[bold green]Adding image to page {page}..."):
+        editor.load_document(input_file)
+        
+        # Prepare dimensions
+        dimensions = None
+        if width and height:
+            dimensions = (width, height)
+        elif width or height:
+            console.print("[red]Error: Both --width and --height must be provided together[/red]")
+            sys.exit(1)
+        
+        operation = AddImageOperation(page, image, (x, y), dimensions)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Successfully added image\n"
+        f"[blue]Page:[/blue] {page}\n"
+        f"[blue]Image:[/blue] {image}\n"
+        f"[blue]Position:[/blue] ({x}, {y})\n"
+        f"[blue]Dimensions:[/blue] {dimensions or 'original'}\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Add Image Complete"
+    ))
+
+
+@cli.command()
+@click.argument('input_file', type=click.Path(exists=True))
+@click.argument('output_file', type=click.Path())
+@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
+@click.option('--index', '-i', type=int, required=True, help='Image index (0-based)')
+@click.option('--new-image', type=click.Path(exists=True), required=True, help='New image file path')
+@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
+@click.pass_context
+@handle_cli_errors
+def replace_image(ctx, input_file: str, output_file: str, page: int, index: int, 
+                 new_image: str, force: bool):
+    """Replace an existing image in a PDF page."""
+    
+    output_path = Path(output_file)
+    if output_path.exists() and not force:
+        console.print(f"[red]Output file already exists: {output_file}[/red]")
+        console.print("Use --force to overwrite")
+        sys.exit(1)
+    
+    if not Path(new_image).exists():
+        console.print(f"[red]Error: New image file not found: {new_image}[/red]")
+        sys.exit(1)
+    
+    editor = ctx.obj['editor']
+    
+    with console.status(f"[bold green]Replacing image {index} on page {page}..."):
+        editor.load_document(input_file)
+        
+        operation = ReplaceImageOperation(page, index, new_image)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Successfully replaced image\n"
+        f"[blue]Page:[/blue] {page}\n"
+        f"[blue]Image index:[/blue] {index}\n"
+        f"[blue]New image:[/blue] {new_image}\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Replace Image Complete"
+    ))
+
+
+@cli.command()
+@click.option('--page', '-p', type=int, required=True, help='Page number')
+@click.option('--type', '-t', type=click.Choice(['text', 'checkbox', 'radio', 'list', 'dropdown', 'signature']), 
+              required=True, help='Field type')
+@click.option('--rect', '-r', type=str, required=True, help='Rectangle coordinates (x0,y0,x1,y1)')
+@click.option('--name', '-n', type=str, required=True, help='Field name')
+@click.option('--value', '-v', type=str, help='Default value')
+@click.option('--options', type=str, help='Options for list/dropdown fields (comma-separated)')
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def create_field(ctx, page: int, type: str, rect: str, name: str, value: str, options: str, input_file: str, output_file: str):
+    """Create a form field in PDF."""
+    
+    editor = ctx.obj['editor']
+    
+    # Parse rectangle
+    try:
+        rect_tuple = tuple(map(float, rect.split(',')))
+    except ValueError:
+        console.print("[red]Error: Rectangle must be comma-separated numbers (x0,y0,x1,y1)[/red]")
+        sys.exit(1)
+    
+    # Parse options
+    options_list = options.split(',') if options else []
+    
+    with console.status(f"[bold green]Creating {type} field '{name}' on page {page}..."):
+        editor.load_document(input_file)
+        
+        operation = CreateFormFieldOperation(page, type, rect_tuple, name, value, options_list)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Form field created successfully\\n"
+        f"[blue]Type:[/blue] {type}\\n"
+        f"[blue]Name:[/blue] {name}\\n"
+        f"[blue]Page:[/blue] {page}\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Form Field Created"
+    ))
+
+
+@cli.command()
+@click.option('--page', '-p', type=int, help='Page number (optional, applies to all pages if not specified)')
+@click.option('--data', '-d', type=str, required=True, help='Field data as JSON string (e.g., \\"{\'field1\':\'value1\'}\\")')
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def fill_field(ctx, page: int, data: str, input_file: str, output_file: str):
+    """Fill form fields with data."""
+    
+    editor = ctx.obj['editor']
+    
+    # Parse field data
+    try:
+        import json
+        field_data = json.loads(data)
+    except json.JSONDecodeError:
+        console.print("[red]Error: Invalid JSON format for field data[/red]")
+        sys.exit(1)
+    
+    with console.status("[bold green]Filling form fields..."):
+        editor.load_document(input_file)
+        
+        operation = FillFormFieldOperation(field_data, page)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Form fields filled successfully\\n"
+        f"[blue]Fields:[/blue] {len(field_data)}\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Form Fields Filled"
+    ))
+
+
+@cli.command()
+@click.option('--page', '-p', type=int, required=True, help='Page number')
+@click.option('--rect', '-r', type=str, required=True, help='Rectangle coordinates (x0,y0,x1,y1)')
+@click.option('--type', '-t', type=click.Choice(['text', 'highlight', 'underline', 'strikeout', 'note', 'rectangle', 'circle']), 
+              required=True, help='Annotation type')
+@click.option('--content', '-c', type=str, help='Annotation content')
+@click.option('--author', '-a', type=str, help='Author name')
+@click.option('--color', type=str, default='red', help='Color (default: red)')
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def add_annotation(ctx, page: int, rect: str, type: str, content: str, author: str, color: str, input_file: str, output_file: str):
+    """Add annotation to PDF."""
+    
+    editor = ctx.obj['editor']
+    
+    # Parse rectangle
+    try:
+        rect_tuple = tuple(map(float, rect.split(',')))
+    except ValueError:
+        console.print("[red]Error: Rectangle must be comma-separated numbers (x0,y0,x1,y1)[/red]")
+        sys.exit(1)
+    
+    # Convert color string to tuple
+    color_map = {
+        'red': (1, 0, 0),
+        'green': (0, 1, 0),
+        'blue': (0, 0, 1),
+        'yellow': (1, 1, 0),
+        'purple': (1, 0, 1),
+        'cyan': (0, 1, 1),
+        'black': (0, 0, 0)
+    }
+    color_tuple = color_map.get(color.lower(), (1, 0, 0))
+    
+    with console.status(f"[bold green]Adding {type} annotation..."):
+        editor.load_document(input_file)
+        
+        operation = AddAnnotationOperation(page, rect_tuple, type, content, author, color_tuple)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Annotation added successfully\\n"
+        f"[blue]Type:[/blue] {type}\\n"
+        f"[blue]Page:[/blue] {page}\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Annotation Added"
+    ))
+
+
+@cli.command()
+@click.option('--user-password', type=str, help='User password for opening')
+@click.option('--owner-password', type=str, help='Owner password for permissions')
+@click.option('--encryption', type=click.Choice(['40', '128', '256']), default='128', help='Encryption strength')
+@click.option('--permissions', type=str, help='Permissions JSON string')
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def set_password(ctx, user_password: str, owner_password: str, encryption: str, permissions: str, input_file: str, output_file: str):
+    """Set password protection for PDF."""
+    
+    editor = ctx.obj['editor']
+    
+    # Parse permissions
+    perms = {}
+    if permissions:
+        try:
+            import json
+            perms = json.loads(permissions)
+        except json.JSONDecodeError:
+            console.print("[red]Error: Invalid JSON format for permissions[/red]")
+            sys.exit(1)
+    
+    with console.status("[bold green]Setting password protection..."):
+        editor.load_document(input_file)
+        
+        operation = SetPasswordOperation(user_password, owner_password, perms, int(encryption))
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Password protection set\\n"
+        f"[blue]Encryption:[/blue] {encryption}-bit\\n"
+        f"[blue]User Password:[/blue] {'Yes' if user_password else 'No'}\\n"
+        f"[blue]Owner Password:[/blue] {'Yes' if owner_password else 'No'}\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Password Protection Added"
+    ))
+
+
+@cli.command()
+@click.option('--title', type=str, help='Document title')
+@click.option('--author', type=str, help='Document author')
+@click.option('--subject', type=str, help='Document subject')
+@click.option('--keywords', type=str, help='Document keywords')
+@click.option('--creator', type=str, help='Document creator')
+@click.argument('input_file')
+@click.argument('output_file')
+@click.pass_context
+def edit_metadata(ctx, title: str, author: str, subject: str, keywords: str, creator: str, input_file: str, output_file: str):
+    """Edit PDF metadata."""
+    
+    editor = ctx.obj['editor']
+    
+    # Build metadata dictionary
+    metadata = {}
+    if title:
+        metadata['title'] = title
+    if author:
+        metadata['author'] = author
+    if subject:
+        metadata['subject'] = subject
+    if keywords:
+        metadata['keywords'] = keywords
+    if creator:
+        metadata['creator'] = creator
+    
+    if not metadata:
+        console.print("[red]Error: At least one metadata field must be specified[/red]")
+        sys.exit(1)
+    
+    with console.status("[bold green]Editing metadata..."):
+        editor.load_document(input_file)
+        
+        operation = EditMetadataOperation(metadata)
+        editor.add_operation(operation)
+        
+        editor.execute_operations()
+        editor.save_document(output_file)
+    
+    console.print(Panel.fit(
+        f"[green]✓[/green] Metadata updated successfully\\n"
+        f"[blue]Fields:[/blue] {len(metadata)}\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}",
+        title="Metadata Updated"
+    ))
+
+
+@cli.command()
+@click.argument('input_file', type=click.Path(exists=True))
+@click.argument('output_file', type=click.Path())
+@click.option('--dpi', type=int, default=300, help='DPI for image conversion (higher = sharper text)')
+@click.option('--quality', type=int, default=95, help='JPEG quality (1-100)')
+@click.option('--preserve-text/--no-preserve-text', default=True, help='Preserve text layer and links (default: True)')
+@click.option('--legacy', is_flag=True, help='Use legacy image-based conversion (loses text layer)')
+@click.option('--verbose', '-v', is_flag=True, default=True, help='Show detailed progress')
+@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
+@click.pass_context
+@handle_cli_errors
+def dark_mode(ctx, input_file: str, output_file: str, dpi: int, quality: int, preserve_text: bool, legacy: bool, verbose: bool, force: bool):
+    """Convert PDF to dark mode (black background, white text) with text preservation."""
+    
+    # Display mode information
+    if not legacy and preserve_text:
+        console.print("[green]✅ Enhanced Dark Mode[/green]: Preserves text layer, links, and form fields")
+    elif legacy:
+        console.print("[yellow]⚠️  Legacy Dark Mode[/yellow]: Converts to images (text layer lost)")
+    else:
+        console.print("[yellow]⚠️  Image-based Dark Mode[/yellow]: Text layer and links will be lost")
+    
+    output_path = Path(output_file)
+    if output_path.exists() and not force:
+        console.print(f"[red]Output file already exists: {output_file}[/red]")
+        console.print("Use --force to overwrite")
+        sys.exit(1)
+    
+    editor = ctx.obj['editor']
+    
+    with console.status("[bold green]Converting PDF to enhanced dark mode..."):
+        # Load document
+        editor.load_document(input_file)
+        
+        # Add dark mode operation
+        operation = DarkModeOperation(
+            dpi=dpi, 
+            quality=quality, 
+            verbose=verbose,
+            preserve_text=preserve_text and not legacy,
+            preserve_forms=preserve_text and not legacy,
+            preserve_links=preserve_text and not legacy,
+            use_enhanced=not legacy
+        )
+        editor.add_operation(operation)
+        
+        # Execute operations
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Converting to enhanced dark mode...", total=None)
+            
+            editor.execute_operations()
+            progress.update(task, description="Saving document...")
+            
+            # Save document
+            editor.save_document(output_file)
+    
+    # Show results
+    mode_text = "Enhanced (text preserved)" if not legacy else "Legacy (image-based)"
+    console.print(Panel.fit(
+        f"[green]✓[/green] Successfully converted to {mode_text} dark mode\\n"
+        f"[blue]Input:[/blue] {input_file}\\n"
+        f"[blue]Output:[/blue] {output_file}\\n"
+        f"[blue]Mode:[/blue] {mode_text}\\n"
+        f"[blue]Text Layer:[/blue] {'Preserved ✓' if not legacy else 'Lost ✗'}\\n"
+        f"[blue]Links:[/blue] {'Active ✓' if not legacy else 'Lost ✗'}\\n"
+        f"[blue]Forms:[/blue] {'Functional ✓' if not legacy else 'Lost ✗'}",
+        title="Dark Mode Conversion"
+    ))
+
+
+@cli.command()
+@click.argument('input_file')
+@click.argument('output_file')
 @click.pass_context
 def config_show(ctx):
     """Show current configuration."""
@@ -346,371 +762,16 @@ def config_set(ctx, key: str, value: str):
         sys.exit(1)
 
 
-# Text Operations Commands
-
-@cli.group()
-def text():
-    """Text manipulation operations."""
-    pass
 
 
-@text.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--search', '-s', required=True, help='Text to search for')
-@click.option('--color', '-c', default='1,1,0', help='Highlight color (RGB, e.g., "1,1,0" for yellow)')
-@click.option('--pages', '-p', help='Pages to search (comma-separated, default: all)')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def highlight(ctx, input_file: str, output_file: str, search: str, color: str, 
-             pages: str, force: bool):
-    """Highlight text in PDF pages."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    # Parse color
-    try:
-        color_tuple = tuple(float(c.strip()) for c in color.split(','))
-        if len(color_tuple) != 3:
-            raise ValueError("Color must have 3 components")
-    except ValueError:
-        console.print("[red]Error: Invalid color format. Use RGB values like '1,1,0'[/red]")
-        sys.exit(1)
-    
-    # Parse page numbers
-    page_list = None
-    if pages:
-        try:
-            page_list = [int(p.strip()) for p in pages.split(',')]
-        except ValueError:
-            console.print("[red]Error: Invalid page numbers[/red]")
-            sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Highlighting text '{search}'..."):
-        document = editor.load_document(input_file)
-        
-        operation = HighlightTextOperation(search, color_tuple, page_list)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully highlighted text\n"
-        f"[blue]Search text:[/blue] {search}\n"
-        f"[blue]Pages:[/blue] {page_list or 'all'}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Text Highlight Complete"
-    ))
 
 
-@text.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--x', type=float, required=True, help='X coordinate')
-@click.option('--y', type=float, required=True, help='Y coordinate')
-@click.option('--text', '-t', required=True, help='Annotation text')
-@click.option('--type', 'annotation_type', type=click.Choice(['note', 'text', 'free_text', 'callout']), 
-              default='note', help='Annotation type')
-@click.option('--author', default='PDF Editor', help='Annotation author')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def annotate(ctx, input_file: str, output_file: str, page: int, x: float, y: float, 
-            text: str, annotation_type: str, author: str, force: bool):
-    """Add annotation to a PDF page."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Adding annotation to page {page}..."):
-        document = editor.load_document(input_file)
-        
-        operation = AddAnnotationOperation(page, (x, y), text, annotation_type, author)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully added annotation\n"
-        f"[blue]Page:[/blue] {page}\n"
-        f"[blue]Position:[/blue] ({x}, {y})\n"
-        f"[blue]Type:[/blue] {annotation_type}\n"
-        f"[blue]Text:[/blue] {text}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Add Annotation Complete"
-    ))
 
 
-# Page Operations Commands
-
-@cli.group()
-def pages():
-    """Page manipulation operations."""
-    pass
 
 
-@pages.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--position', type=int, required=True, help='Insert position (0-based)')
-@click.option('--width', type=float, help='Page width (for blank page)')
-@click.option('--height', type=float, help='Page height (for blank page)')
-@click.option('--source', help='Source PDF file to insert page from')
-@click.option('--source-page', type=int, help='Page number from source file')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def insert(ctx, input_file: str, output_file: str, position: int, width: float, 
-          height: float, source: str, source_page: int, force: bool):
-    """Insert a page into PDF."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    if source and not Path(source).exists():
-        console.print(f"[red]Error: Source file not found: {source}[/red]")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Inserting page at position {position}..."):
-        document = editor.load_document(input_file)
-        
-        operation = InsertPageOperation(position, width, height, source, source_page)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully inserted page\n"
-        f"[blue]Position:[/blue] {position}\n"
-        f"[blue]Source:[/blue] {source or 'blank page'}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Insert Page Complete"
-    ))
 
 
-@pages.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--pages', '-p', required=True, help='Pages to extract (comma-separated)')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def extract(ctx, input_file: str, output_file: str, pages: str, force: bool):
-    """Extract pages from PDF."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_file}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    # Parse page numbers
-    try:
-        page_list = [int(p.strip()) for p in pages.split(',')]
-    except ValueError:
-        console.print("[red]Error: Invalid page numbers[/red]")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    document = editor.load_document(input_file)
-    
-    # Validate page numbers
-    for page_num in page_list:
-        if page_num < 0 or page_num >= document.page_count:
-            console.print(f"[red]Error: Page number {page_num} out of range[/red]")
-            sys.exit(1)
-    
-    with console.status(f"[bold green]Extracting pages {page_list}..."):
-        operation = ExtractPagesOperation(page_list, output_file)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully extracted pages\n"
-        f"[blue]Pages:[/blue] {page_list}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Extract Pages Complete"
-    ))
-
-
-@pages.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('sources', nargs=-1, required=True)
-@click.option('--output', '-o', required=True, help='Output file path')
-@click.option('--position', type=int, help='Insert position (default: end)')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def merge(ctx, input_file: str, sources: tuple, output: str, position: int, force: bool):
-    """Merge multiple PDFs."""
-    
-    output_path = Path(output)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_path}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    # Validate source files
-    source_list = []
-    for source in sources:
-        if not Path(source).exists():
-            console.print(f"[red]Error: Source file not found: {source}[/red]")
-            sys.exit(1)
-        source_list.append(source)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Merging {len(source_list) + 1} documents..."):
-        document = editor.load_document(input_file)
-        
-        operation = MergeDocumentsOperation(source_list, output, position)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully merged documents\n"
-        f"[blue]Sources:[/blue] {len(source_list)} files\n"
-        f"[blue]Output:[/blue] {output}",
-        title="Merge Documents Complete"
-    ))
-
-
-# Image Operations Commands
-
-@cli.group()
-def images():
-    """Image manipulation operations."""
-    pass
-
-
-@images.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--page', '-p', type=int, required=True, help='Page number (0-based)')
-@click.option('--index', '-i', type=int, required=True, help='Image index (0-based)')
-@click.option('--filter', 'filter_type', type=click.Choice(['brightness', 'contrast', 'sharpness', 'blur', 'grayscale']), 
-              required=True, help='Filter type')
-@click.option('--intensity', type=float, default=1.0, help='Filter intensity (0-2)')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def filter(ctx, input_file: str, output_file: str, page: int, index: int, 
-          filter_type: str, intensity: float, force: bool):
-    """Apply filter to an image in PDF."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_path}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Applying {filter_type} filter..."):
-        document = editor.load_document(input_file)
-        
-        operation = ImageFilterOperation(page, index, filter_type, intensity)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully applied filter\n"
-        f"[blue]Page:[/blue] {page}\n"
-        f"[blue]Image index:[/blue] {index}\n"
-        f"[blue]Filter:[/blue] {filter_type}\n"
-        f"[blue]Intensity:[/blue] {intensity}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Image Filter Complete"
-    ))
-
-
-@images.command()
-@click.argument('input_file', type=click.Path(exists=True))
-@click.argument('output_file', type=click.Path())
-@click.option('--text', '-t', required=True, help='Watermark text')
-@click.option('--pages', '-p', help='Pages to watermark (comma-separated, default: all)')
-@click.option('--size', type=int, default=48, help='Font size')
-@click.option('--opacity', type=float, default=0.3, help='Opacity (0-1)')
-@click.option('--rotation', type=int, default=45, help='Rotation angle')
-@click.option('--color', default='0.5,0.5,0.5', help='Color (RGB)')
-@click.option('--position', type=click.Choice(['center', 'top_left', 'top_right', 'bottom_left', 'bottom_right']), 
-              default='center', help='Position')
-@click.option('--force', '-f', is_flag=True, help='Overwrite existing output file')
-@click.pass_context
-@handle_cli_errors
-def watermark(ctx, input_file: str, output_file: str, text: str, pages: str, size: int, 
-             opacity: float, rotation: int, color: str, position: str, force: bool):
-    """Add text watermark to PDF."""
-    
-    output_path = Path(output_file)
-    if output_path.exists() and not force:
-        console.print(f"[red]Output file already exists: {output_path}[/red]")
-        console.print("Use --force to overwrite")
-        sys.exit(1)
-    
-    # Parse color
-    try:
-        color_tuple = tuple(float(c.strip()) for c in color.split(','))
-        if len(color_tuple) != 3:
-            raise ValueError("Color must have 3 components")
-    except ValueError:
-        console.print("[red]Error: Invalid color format. Use RGB values like '0.5,0.5,0.5'[/red]")
-        sys.exit(1)
-    
-    # Parse page numbers
-    page_list = None
-    if pages:
-        try:
-            page_list = [int(p.strip()) for p in pages.split(',')]
-        except ValueError:
-            console.print("[red]Error: Invalid page numbers[/red]")
-            sys.exit(1)
-    
-    editor = ctx.obj['editor']
-    
-    with console.status(f"[bold green]Adding watermark '{text}'..."):
-        document = editor.load_document(input_file)
-        
-        operation = AddWatermarkOperation(text, page_list, size, opacity, rotation, color_tuple, position)
-        editor.add_operation(operation)
-        
-        results = editor.execute_operations()
-        editor.save_document(output_file)
-    
-    console.print(Panel.fit(
-        f"[green]✓[/green] Successfully added watermark\n"
-        f"[blue]Text:[/blue] {text}\n"
-        f"[blue]Pages:[/blue] {page_list or 'all'}\n"
-        f"[blue]Position:[/blue] {position}\n"
-        f"[blue]Output:[/blue] {output_file}",
-        title="Watermark Complete"
-    ))
 
 
 if __name__ == '__main__':

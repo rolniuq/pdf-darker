@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union, Callable
 from pathlib import Path
 import functools
 
-from .base import PDFException, ValidationError, ProcessingError
+from ..core.base import PDFException, ValidationError, ProcessingError
 from ..utils.logging import get_logger
 
 

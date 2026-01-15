@@ -1,4 +1,4 @@
-"""Dark mode operation using proven conversion logic from original init.py."""
+"""Dark mode operation with enhanced text preservation."""
 
 from typing import Any, Dict, Union
 from pathlib import Path
@@ -9,22 +9,28 @@ from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocume
 from ..config.manager import config_manager
 from ..utils.logging import get_logger
 
-
-# Import the proven dark mode conversion functions
+# Import both legacy and enhanced dark mode functions
 from .dark_mode_legacy import invert_image
+from .enhanced_dark_mode import EnhancedDarkModeOperation
 
 
 class DarkModeOperation(BaseOperation):
-    """Operation to convert PDF to dark mode using proven logic."""
+    """Operation to convert PDF to dark mode with enhanced text preservation."""
     
-    def __init__(self, dpi: int = None, quality: int = None, verbose: bool = True):
+    def __init__(self, dpi: int = None, quality: int = None, verbose: bool = True,
+                 preserve_text: bool = True, preserve_forms: bool = True, 
+                 preserve_links: bool = True, use_enhanced: bool = True):
         # Use the DARK_MODE operation type
         super().__init__(OperationType.DARK_MODE)
         
-        # Set parameters from config or defaults (matching original init.py)
+        # Set parameters from config or defaults with enhanced options
         self.set_parameter("dpi", dpi or config_manager.get("dpi", 300))
         self.set_parameter("quality", quality or config_manager.get("quality", 95))
         self.set_parameter("verbose", verbose)
+        self.set_parameter("preserve_text", preserve_text)
+        self.set_parameter("preserve_forms", preserve_forms)
+        self.set_parameter("preserve_links", preserve_links)
+        self.set_parameter("use_enhanced", use_enhanced)
     
     def validate(self, document: PDFDocument) -> bool:
         """Validate dark mode operation parameters."""
@@ -46,16 +52,51 @@ class DarkModeOperation(BaseOperation):
         return True
     
     def execute(self, document: PDFDocument) -> OperationResult:
-        """Execute dark mode conversion using proven algorithm."""
+        """Execute dark mode conversion with text preservation."""
         try:
-            from pdf2image import convert_from_path
-            
             dpi = self.get_parameter("dpi")
             quality = self.get_parameter("quality")
             verbose = self.get_parameter("verbose")
+            preserve_text = self.get_parameter("preserve_text")
+            preserve_forms = self.get_parameter("preserve_forms")
+            preserve_links = self.get_parameter("preserve_links")
+            use_enhanced = self.get_parameter("use_enhanced")
             
             if verbose:
-                self.logger.info(f"Converting PDF to dark mode (DPI={dpi}, quality={quality})")
+                mode_type = "Enhanced (preserves text/links)" if use_enhanced else "Legacy (image conversion)"
+                self.logger.info(f"Converting PDF to {mode_type} dark mode (DPI={dpi}, quality={quality})")
+                self.logger.info(f"Preserve text: {preserve_text}, forms: {preserve_forms}, links: {preserve_links}")
+            
+            if use_enhanced:
+                # Use enhanced dark mode that preserves text layer
+                enhanced_op = EnhancedDarkModeOperation(
+                    preserve_text=preserve_text,
+                    preserve_forms=preserve_forms,
+                    preserve_links=preserve_links,
+                    dpi=dpi,
+                    quality=quality,
+                    verbose=verbose
+                )
+                
+                # Execute enhanced conversion directly
+                return enhanced_op.execute(document)
+                
+            else:
+                # Fall back to legacy image conversion method
+                return self._execute_legacy_conversion(document, dpi, quality, verbose)
+                    
+        except Exception as e:
+            error_msg = f"Dark mode conversion failed: {e}"
+            self.logger.error(error_msg)
+            return OperationResult.FAILED
+    
+    def _execute_legacy_conversion(self, document, dpi, quality, verbose):
+        """Execute legacy image-based dark mode conversion."""
+        try:
+            from pdf2image import convert_from_path
+            
+            if verbose:
+                self.logger.info("Using legacy image-based conversion (text layer will be lost)")
             
             # Create temporary files for conversion
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_input:
@@ -126,9 +167,5 @@ class DarkModeOperation(BaseOperation):
                     
         except ImportError as e:
             error_msg = f"Missing required dependencies for dark mode conversion: {e}"
-            self.logger.error(error_msg)
-            return OperationResult.FAILED
-        except Exception as e:
-            error_msg = f"Dark mode conversion failed: {e}"
             self.logger.error(error_msg)
             return OperationResult.FAILED
