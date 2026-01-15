@@ -71,27 +71,27 @@ class AddAnnotationOperation(AnnotationOperation):
             
             # Create annotation based on type
             if annotation_type == "text":
-                annot = self._create_text_annotation(page, rect, content, author, color)
+                self._create_text_annotation(page, rect, content, author, color)
             elif annotation_type == "highlight":
-                annot = self._create_highlight_annotation(page, rect, content, color)
+                self._create_highlight_annotation(page, rect, content, color)
             elif annotation_type == "underline":
-                annot = self._create_underline_annotation(page, rect, color)
+                self._create_underline_annotation(page, rect, color)
             elif annotation_type == "strikeout":
-                annot = self._create_strikeout_annotation(page, rect, color)
+                self._create_strikeout_annotation(page, rect, color)
             elif annotation_type == "squiggly":
-                annot = self._create_squiggly_annotation(page, rect, color)
+                self._create_squiggly_annotation(page, rect, color)
             elif annotation_type == "note":
-                annot = self._create_note_annotation(page, rect, content, author, color)
+                self._create_note_annotation(page, rect, content, author, color)
             elif annotation_type == "free_text":
-                annot = self._create_free_text_annotation(page, rect, content, color)
+                self._create_free_text_annotation(page, rect, content, color)
             elif annotation_type == "line":
-                annot = self._create_line_annotation(page, rect, color)
+                self._create_line_annotation(page, rect, color)
             elif annotation_type == "arrow":
-                annot = self._create_arrow_annotation(page, rect, color)
+                self._create_arrow_annotation(page, rect, color)
             elif annotation_type == "rectangle":
-                annot = self._create_rectangle_annotation(page, rect, color)
+                self._create_rectangle_annotation(page, rect, color)
             elif annotation_type == "circle":
-                annot = self._create_circle_annotation(page, rect, color)
+                self._create_circle_annotation(page, rect, color)
             else:
                 self.logger.error(f"Unsupported annotation type: {annotation_type}")
                 return OperationResult.FAILED
@@ -190,9 +190,9 @@ class AddAnnotationOperation(AnnotationOperation):
     def _create_circle_annotation(self, page, rect, color):
         """Create a circle annotation."""
         # Calculate center and radius from rect
-        center_x = (rect[0] + rect[2]) / 2
-        center_y = (rect[1] + rect[3]) / 2
-        radius = min(rect[2] - rect[0], rect[3] - rect[1]) / 2
+        (rect[0] + rect[2]) / 2
+        (rect[1] + rect[3]) / 2
+        min(rect[2] - rect[0], rect[3] - rect[1]) / 2
         
         quad = fitz.Quad(rect)
         annot = page.add_quad_annot(quad)
@@ -341,15 +341,15 @@ class AddDrawingOperation(AnnotationOperation):
             
             # Create drawing based on type
             if drawing_type == "line":
-                annot = self._create_line_drawing(page, points, color, thickness)
+                self._create_line_drawing(page, points, color, thickness)
             elif drawing_type == "polygon":
-                annot = self._create_polygon_drawing(page, points, color, thickness, fill)
+                self._create_polygon_drawing(page, points, color, thickness, fill)
             elif drawing_type == "polyline":
-                annot = self._create_polyline_drawing(page, points, color, thickness)
+                self._create_polyline_drawing(page, points, color, thickness)
             elif drawing_type == "rectangle":
-                annot = self._create_rectangle_drawing(page, points, color, thickness, fill)
+                self._create_rectangle_drawing(page, points, color, thickness, fill)
             elif drawing_type == "ellipse":
-                annot = self._create_ellipse_drawing(page, points, color, thickness, fill)
+                self._create_ellipse_drawing(page, points, color, thickness, fill)
             else:
                 self.logger.error(f"Unsupported drawing type: {drawing_type}")
                 return OperationResult.FAILED

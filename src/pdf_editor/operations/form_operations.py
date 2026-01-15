@@ -81,17 +81,17 @@ class CreateFormFieldOperation(FormOperation):
             
             # Create form field based on type
             if field_type == "text":
-                widget = self._create_text_field(page, rect, field_name, value)
+                self._create_text_field(page, rect, field_name, value)
             elif field_type == "checkbox":
-                widget = self._create_checkbox_field(page, rect, field_name, value)
+                self._create_checkbox_field(page, rect, field_name, value)
             elif field_type == "radio":
-                widget = self._create_radio_field(page, rect, field_name, options)
+                self._create_radio_field(page, rect, field_name, options)
             elif field_type == "list":
-                widget = self._create_list_field(page, rect, field_name, options)
+                self._create_list_field(page, rect, field_name, options)
             elif field_type == "dropdown":
-                widget = self._create_dropdown_field(page, rect, field_name, options, value)
+                self._create_dropdown_field(page, rect, field_name, options, value)
             elif field_type == "signature":
-                widget = self._create_signature_field(page, rect, field_name)
+                self._create_signature_field(page, rect, field_name)
             else:
                 self.logger.error(f"Unsupported field type: {field_type}")
                 return OperationResult.FAILED

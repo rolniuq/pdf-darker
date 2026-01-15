@@ -411,7 +411,7 @@ class AddSecurityWatermarkOperation(SecurityOperation):
                     center_y = 3 * page_rect.height / 4
                 
                 # Create watermark text with rotation
-                text_point = fitz.Point(center_x, center_y)
+                fitz.Point(center_x, center_y)
                 text_rect = fitz.Rect(
                     center_x - 200, center_y - 50,
                     center_x + 200, center_y + 50

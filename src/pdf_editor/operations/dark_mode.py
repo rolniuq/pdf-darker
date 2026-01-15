@@ -1,13 +1,10 @@
 """Dark mode operation with enhanced text preservation."""
 
-from typing import Any, Dict, Union
-from pathlib import Path
 import tempfile
 import os
 
-from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument, PDFException
+from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument
 from ..config.manager import config_manager
-from ..utils.logging import get_logger
 
 # Import both legacy and enhanced dark mode functions
 from .dark_mode_legacy import invert_image

@@ -1,6 +1,5 @@
 """Enhanced dark mode operation that preserves text layer and interactivity."""
 
-from typing import Any, Dict, Union
 import tempfile
 import os
 
@@ -17,9 +16,8 @@ except ImportError:
     Image = None
     ImageOps = None
 
-from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument, PDFException
+from ..core.base import BaseOperation, OperationType, OperationResult, PDFDocument
 from ..config.manager import config_manager
-from ..utils.logging import get_logger
 
 
 class EnhancedDarkModeOperation(BaseOperation):
