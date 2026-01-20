@@ -4,9 +4,10 @@ from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 
 from .base import (
-    PDFDocument, OperationManager, PluginManager,
+    OperationManager, PluginManager,
     BaseOperation, PDFException
 )
+from .document import PDFDocument
 from ..config.manager import config_manager
 from ..utils.logging import get_logger
 
@@ -89,9 +90,8 @@ class PDFEditor:
             output_path = self.current_document.file_path
         
         try:
-            # This would be implemented by the actual document class
-            # For now, just mark as saved
-            self.current_document.clear_modified_flag()
+            # Save the document using the document's save method
+            self.current_document.save(output_path)
             self.logger.info(f"Document saved to: {output_path}")
             return True
             
@@ -115,6 +115,10 @@ class PDFEditor:
         if not self.current_document:
             raise PDFException("No document loaded")
         
+        # Actually execute the operations
+        self.operation_manager.execute_operations(self.current_document)
+        
+        # Get the results summary
         summary = self.operation_manager.get_results_summary()
         
         self.logger.info(f"Operations completed: {summary['successful']}/{summary['total']} successful")

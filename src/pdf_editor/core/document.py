@@ -80,8 +80,21 @@ class PDFPage:
             fontsize: Font size
             color: RGB color tuple
         """
-        rect = fitz.Rect(position[0], position[1], position[0] + 100, position[1] + 20)
-        self._page.insert_text(rect, text, fontname=fontname, fontsize=fontsize, color=color)
+        # Use simpler text insertion method
+        try:
+            # Method 1: Try simple insert_text at point
+            self._page.insert_text(position, text, fontsize=fontsize, color=color, fontname=fontname)
+        except Exception:
+            try:
+                # Method 2: Try with rect approach
+                rect = fitz.Rect(position[0], position[1], position[0] + 200, position[1] + 50)
+                self._page.insert_text(rect, text, fontsize=fontsize, color=color, fontname=fontname)
+            except Exception:
+                # Method 3: Use free text annotation as fallback
+                point = position
+                rect = fitz.Rect(point[0], point[1], point[0] + 200, point[1] + 30)
+                self._page.add_freetext_annot(rect, text, fontsize=fontsize, color=color)
+        
         self._modified = True
         self.logger.debug(f"Added text to page {self.number}: {text[:20]}...")
     
@@ -284,11 +297,14 @@ class PDFDocument(BasePDFDocument):
             deflate = True
         
         try:
-            save_options = fitz.PDF_MDEFLATE if deflate else fitz.PDF_MNONE
-            if garbage_collect:
-                save_options |= fitz.PDF_MGARBAGE
+            # Use modern PyMuPDF save parameters
+            save_kwargs = {
+                "garbage": garbage_collect,
+                "deflate": deflate,
+                "clean": True
+            }
             
-            self._doc.save(str(output_path), garbage=garbage_collect, deflate=deflate)
+            self._doc.save(str(output_path), **save_kwargs)
             self.clear_modified_flag()
             
             # Update metadata

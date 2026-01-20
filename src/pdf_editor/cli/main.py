@@ -58,6 +58,32 @@ from ..config.manager import config_manager
 from ..utils.logging import get_logger, setup_logging
 from ..utils.validation import ValidationError, ProcessingError
 
+# Create CLI group
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx):
+    """Comprehensive PDF editing tool."""
+    ctx.ensure_object(dict)
+    ctx.obj['editor'] = PDFEditor()
+    
+    if ctx.invoked_subcommand is None:
+        # Show help when no command is provided
+        console.print(Panel.fit(
+            "[bold cyan]PDF Editor[/bold cyan]\\n\\n"
+            "Use '--help' to see all available commands\\n\\n"
+            "[bold]Common Commands:[/bold]\\n"
+            "• dark-mode     - Convert PDF to dark mode\\n"
+            "• info          - Show document information\\n"
+            "• rotate        - Rotate pages\\n"
+            "• add-text      - Add text to PDF\\n"
+            "• delete-pages  - Delete pages\\n\\n"
+            "[bold]Examples:[/bold]\\n"
+            "• pdf-editor dark-mode input.pdf output.pdf\\n"
+            "• pdf-editor info input.pdf\\n"
+            "• pdf-editor rotate input.pdf output.pdf --page 0 --angle 90",
+            title="PDF Editor - CLI"
+        ))
+
 console = Console()
 logger = get_logger("cli")
 
@@ -851,10 +877,8 @@ def web_api(host: str, port: int, upload_folder: str, debug: bool):
 
 @cli.command()
 @click.option('--gui', '-g', is_flag=True, help='Launch GUI instead of CLI')
-@click.argument('input_file', required=False)
-@click.argument('output_file', required=False)
 @click.pass_context
-def main(ctx, gui: bool, input_file: str, output_file: str):
+def main(ctx, gui: bool):
     """PDF Editor with CLI and GUI modes."""
     if gui:
         # Launch GUI mode
@@ -884,16 +908,7 @@ def main(ctx, gui: bool, input_file: str, output_file: str):
         ))
 
 
-@cli.command()
-@click.argument('input_file')
-@click.argument('output_file')
-@click.pass_context
-def cli(ctx):
-    """PDF Editor CLI."""
-    # Initialize context
-    ctx.ensure_object(dict)
-    ctx.obj['editor'] = PDFEditor(config_file=config)
-    ctx.obj['verbose'] = verbose if 'verbose' in ctx.params else True
+
 
 
 if __name__ == '__main__':
