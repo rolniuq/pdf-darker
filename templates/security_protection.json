@@ -1,0 +1,56 @@
+{
+  "name": "Security Protection",
+  "description": "Apply password protection and permissions to PDFs",
+  "version": "1.0",
+  "operations": [
+    {
+      "type": "set_password",
+      "parameters": {
+        "user_password": "${user_pass}",
+        "owner_password": "${owner_pass}",
+        "encryption": ${encryption_level},
+        "permissions": {
+          "print": ${allow_print},
+          "modify": ${allow_modify},
+          "copy": ${allow_copy},
+          "annotate": ${allow_annotate}
+        }
+      }
+    },
+    {
+      "type": "edit_metadata",
+      "parameters": {
+        "title": "${doc_title}",
+        "author": "${doc_author}",
+        "subject": "${doc_subject}",
+        "keywords": "${doc_keywords}"
+      }
+    },
+    {
+      "type": "add_watermark",
+      "parameters": {
+        "text": "${watermark_text}",
+        "font_size": ${font_size},
+        "opacity": ${opacity},
+        "rotation": 45
+      }
+    }
+  ],
+  "default_parameters": {
+    "user_pass": "user123",
+    "owner_pass": "admin456",
+    "encryption_level": 128,
+    "allow_print": true,
+    "allow_modify": false,
+    "allow_copy": true,
+    "allow_annotate": true,
+    "doc_title": "Protected Document",
+    "doc_author": "PDF Editor",
+    "doc_subject": "Confidential",
+    "doc_keywords": "protected,secure",
+    "watermark_text": "CONFIDENTIAL",
+    "font_size": 48,
+    "opacity": 0.3
+  },
+  "category": "security"
+}

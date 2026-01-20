@@ -1,0 +1,43 @@
+{
+  "name": "Form Field Creator",
+  "description": "Add common form fields to PDF documents",
+  "version": "1.0",
+  "operations": [
+    {
+      "type": "create_field",
+      "parameters": {
+        "page": 0,
+        "field_type": "text",
+        "rect": [100, 100, 300, 120],
+        "field_name": "${name_field}",
+        "default_value": ""
+      }
+    },
+    {
+      "type": "create_field",
+      "parameters": {
+        "page": 0,
+        "field_type": "text",
+        "rect": [100, 130, 300, 150],
+        "field_name": "${email_field}",
+        "default_value": ""
+      }
+    },
+    {
+      "type": "create_field",
+      "parameters": {
+        "page": 0,
+        "field_type": "checkbox",
+        "rect": [100, 170, 115, 185],
+        "field_name": "${agree_field}",
+        "default_value": false
+      }
+    }
+  ],
+  "default_parameters": {
+    "name_field": "user_name",
+    "email_field": "user_email", 
+    "agree_field": "terms_agree"
+  },
+  "category": "forms"
+}

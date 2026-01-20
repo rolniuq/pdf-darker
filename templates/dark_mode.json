@@ -1,0 +1,21 @@
+{
+  "name": "Dark Mode Converter",
+  "description": "Convert PDFs to dark mode with enhanced text preservation",
+  "version": "1.0",
+  "operations": [
+    {
+      "type": "dark_mode",
+      "parameters": {
+        "dpi": ${dpi},
+        "quality": ${quality},
+        "preserve_text": true,
+        "use_enhanced": true
+      }
+    }
+  ],
+  "default_parameters": {
+    "dpi": 300,
+    "quality": 95
+  },
+  "category": "conversion"
+}

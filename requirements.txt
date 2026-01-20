@@ -19,6 +19,30 @@ pytesseract>=0.3.10
 pyyaml>=6.0
 python-dotenv>=1.0.0
 
+# GUI framework
+PySide6>=6.6.0
+
+# Advanced export dependencies
+python-docx>=0.8.11
+xlsxwriter>=3.0.0
+python-pptx>=0.6.21
+pandas>=1.5.0
+
+# Cloud storage dependencies (optional)
+# google-api-python-client>=2.0.0
+# google-auth-httplib2>=0.1.0
+# dropbox>=11.0.0
+# onedrivesdk>=2.0.0
+
+# Web framework (optional)
+# flask>=2.0.0
+# fastapi>=0.68.0
+# uvicorn>=0.15.0
+
+# Email integration (optional)
+# smtplib (built-in)
+# email-validator>=1.1.0
+
 # Development dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0
