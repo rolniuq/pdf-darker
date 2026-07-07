@@ -1,7 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // Theme configuration
-  "theme": "opencode",
   "model": "anthropic/claude-opus-4-5",
-  "autoupdate": true
+  "autoupdate": true,
+  "subagents": {
+    "dual-pincer-steelman": "anthropic/claude-opus-4-5",
+    "dual-pincer-redteam": "anthropic/claude-opus-4-5"
+  }
 }

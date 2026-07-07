@@ -1,1 +1,0 @@
-"""Dialogs package for GUI application."""

@@ -1,1 +1,0 @@
-"""Themes package for GUI application."""

@@ -1,156 +1,101 @@
-# PDF Editor
+# pdf-darker
 
-A comprehensive PDF editing tool with dark mode conversion and advanced editing capabilities.
+Convert PDF files to dark mode with pixel-perfect rendering and preserved text layer.
 
-## Features
+Built with **MuPDF.js** (the same C engine as PyMuPDF) — no wrong text, no wrong fonts.
 
-- **Dark Mode Conversion**: Convert PDFs to dark theme (black background, white text)
-- **Page Manipulation**: Rotate, delete, reorder pages
-- **Text Operations**: Add, replace, highlight text
-- **Image Operations**: Insert and manipulate images
-- **Batch Processing**: Process multiple files
-- **Rich CLI**: Beautiful command-line interface with progress bars
-- **Configuration Management**: Flexible YAML-based configuration
+## Install
 
-## Quick Start
-
-### Installation
-
-1. **Install system dependencies:**
-
-**macOS:**
 ```bash
-brew install poppler
+npm install -g pdf-darker
 ```
 
-**Ubuntu/Debian:**
+Or use directly with pnpm:
+
 ```bash
-sudo apt-get install poppler-utils
+git clone <repo>
+cd pdf-darker
+pnpm install
+pnpm build
 ```
 
-**Windows:**
-Download and install poppler from [poppler releases](https://github.com/osber/poppler-windows/releases)
+## Usage
 
-2. **Install Python dependencies:**
+### CLI (TUI)
+
 ```bash
-pip install -r requirements.txt
-pip install -e .
+# Basic conversion (output: input-dark.pdf)
+pnpm convert input.pdf
+
+# Specify output path
+pnpm convert input.pdf output-dark.pdf
+
+# With options
+pnpm convert input.pdf --dpi 200 --no-text
+
+# Or globally installed
+pdf-darker input.pdf output-dark.pdf
 ```
 
-### Basic Usage
+### Web UI
 
-#### Dark Mode Conversion
 ```bash
-python main.py dark-mode input.pdf output_dark.pdf --dpi 300 --quality 95
+# Start the web server on http://localhost:3000
+pnpm server
 ```
 
-#### Page Rotation
-```bash
-python main.py rotate input.pdf output.pdf --page 0 --angle 90
+### Programmatic API
+
+```typescript
+import { Converter } from '@pdf-darker/core';
+
+const converter = new Converter();
+const result = await converter.convert(
+  'input.pdf',
+  'output-dark.pdf',
+  {
+    dpi: 300,
+    quality: 95,
+    preserveText: true,
+    preserveForms: true,
+    preserveLinks: true,
+  },
+  (progress) => {
+    console.log(`Page ${progress.page}/${progress.totalPages} — ${progress.phase}`);
+  },
+);
+
+console.log(`Done! ${result.pageCount} pages in ${result.durationMs}ms`);
 ```
 
-#### Add Text
-```bash
-python main.py add-text input.pdf output.pdf --page 0 --text "Hello World" --x 100 --y 100
-```
+## Options
 
-#### Delete Pages
-```bash
-python main.py delete-pages input.pdf output.pdf --pages "0,2,5"
-```
+|Flag|Type|Default|Description|
+|---|---|---|---|
+|`--dpi`, `-d`|number|300|Rendering resolution|
+|`--quality`, `-q`|number|95|Image quality (1–100)|
+|`--no-text`|boolean|true|Disable hidden text layer|
 
-#### Document Info
-```bash
-python main.py info input.pdf
-```
+## How It Works
 
-#### Configuration
-```bash
-python main.py config-show
-python main.py config-set dpi 200
-```
+1. Render each page to a high-resolution image via MuPDF
+2. Apply **luminance inversion** — preserves hue while inverting brightness
+3. Apply **gamma correction** — boosts midtones for readability
+4. Create new PDF with inverted page images
+5. Overlay **hidden text layer** — keeps text selectable and searchable
 
-### Legacy Usage (Backward Compatible)
-
-For simple dark mode conversion, you can still use the original command:
-```bash
-python init.py input.pdf output_dark.pdf
-```
-
-## Project Structure
+## Architecture
 
 ```
-darker-pdf/
-├── src/pdf_editor/          # Main package
-│   ├── core/               # Core classes and abstractions
-│   ├── operations/         # PDF editing operations
-│   ├── cli/               # Command-line interface
-│   ├── utils/             # Utilities (logging, validation)
-│   └── config/            # Configuration management
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-├── examples/              # Usage examples
-└── init.py               # Legacy dark mode converter
+packages/
+├── shared/     — Types and constants
+├── core/       — PDF engine (MuPDF.js WASM)
+├── tui/        — Terminal UI (Ink + React)
+└── ui/         — Web UI (React + Vite + HTTP server)
 ```
 
-## Development
-
-### Running Tests
-```bash
-pytest
-```
-
-### Code Quality
-```bash
-black src/ tests/
-ruff check src/ tests/
-mypy src/
-```
-
-## Configuration
-
-The tool uses YAML configuration files. Create `~/.pdf_editor_config.yaml`:
-
-```yaml
-dpi: 300
-quality: 95
-compression: true
-output_dir: "./output"
-backup_enabled: true
-log_level: "INFO"
-```
-
-## Roadmap
-
-See [docs/roadmap.md](docs/roadmap.md) for the complete development plan.
-
-### Phase 1: Foundation ✅
-- [x] Modular project structure
-- [x] Configuration management
-- [x] Logging system
-- [x] Rich CLI interface
-- [x] Error handling and validation
-
-### Phase 2: Basic Editing 🚧
-- [ ] Enhanced text operations
-- [ ] Advanced page manipulation
-- [ ] Image processing
-- [ ] Batch operations
-
-### Phase 3: Advanced Features 📋
-- [ ] OCR integration
-- [ ] Form operations
-- [ ] Security features
-- [ ] Annotation system
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+See `ARCHITECTURE.md` and `ALGORITHM.md` for details.
 
 ## License
 
-MIT License - see LICENSE file for details.
+AGPL-3.0 (same as MuPDF.js)
