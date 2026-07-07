@@ -4,6 +4,7 @@
   "private": true,
   "description": "Convert PDF files to dark mode with perfect text fidelity — UI + TUI",
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "bin": {
     "pdf-darker": "./packages/tui/dist/index.js"
   },
