@@ -4,7 +4,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:shared && pnpm build:core && pnpm build:ui
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
     startCommand: node packages/ui/dist/server.js
     healthCheckPath: /health
     envVars:
