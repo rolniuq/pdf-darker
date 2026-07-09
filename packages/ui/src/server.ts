@@ -100,31 +100,36 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 }
 
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export function createServer(): http.Server {
+  return http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
 
-  if (req.method === 'POST' && url.pathname === '/convert') {
-    return handleConvert(req, res);
-  }
+    if (req.method === 'POST' && url.pathname === '/convert') {
+      return handleConvert(req, res);
+    }
 
-  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ok' }));
-  }
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ status: 'ok' }));
+    }
 
-  return serveStatic(req, res);
-});
+    return serveStatic(req, res);
+  });
+}
 
-server.listen(PORT, () => {
-  console.log(`PDF Darker server: http://localhost:${PORT}`);
-});
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMainModule) {
+  createServer().listen(PORT, () => {
+    console.log(`PDF Darker server: http://localhost:${PORT}`);
+  });
+}

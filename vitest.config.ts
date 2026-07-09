@@ -13,6 +13,7 @@ export default defineConfig({
     alias: {
       '@pdf-darker/core': path.resolve(import.meta.dirname, 'packages/core/src'),
       '@pdf-darker/shared': path.resolve(import.meta.dirname, 'packages/shared/src'),
+      '@pdf-darker/ui/server.js': path.resolve(import.meta.dirname, 'packages/ui/src/server.ts'),
     },
   },
 });
