@@ -19,6 +19,8 @@ const MIME: Record<string, string> = {
   '.json': 'application/json',
 };
 
+const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024;
+
 const converter = new Converter();
 
 function sendJSON(res: http.ServerResponse, status: number, data: unknown) {
@@ -42,6 +44,13 @@ async function handleConvert(req: http.IncomingMessage, res: http.ServerResponse
     params = JSON.parse(body.toString());
   } catch {
     return sendJSON(res, 400, { error: 'Invalid JSON' });
+  }
+
+  const decodedSize = Math.round((params.fileData.length * 3) / 4);
+  if (decodedSize > MAX_FILE_SIZE_BYTES) {
+    return sendJSON(res, 413, {
+      error: `File too large (${Math.round(decodedSize / 1024 / 1024)} MB). Maximum is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`,
+    });
   }
 
   const inputPath = path.join(os.tmpdir(), `pdf-darker-in-${Date.now()}.pdf`);
@@ -106,6 +115,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/convert') {
     return handleConvert(req, res);
+  }
+
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ status: 'ok' }));
   }
 
   return serveStatic(req, res);
