@@ -62,7 +62,7 @@ async function handleConvert(req: http.IncomingMessage, res: http.ServerResponse
     const result = await converter.convert(inputPath, outputPath, {
       dpi: params.dpi || 300,
       quality: 95,
-      preserveText: params.preserveText !== false,
+      preserveText: params.preserveText === true,
       preserveForms: true,
       preserveLinks: true,
     });

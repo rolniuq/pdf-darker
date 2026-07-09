@@ -9,7 +9,7 @@ function formatBytes(bytes: number): string {
 export function App() {
   const [file, setFile] = useState<File | null>(null);
   const [dpi, setDpi] = useState(300);
-  const [preserveText, setPreserveText] = useState(true);
+  const [preserveText, setPreserveText] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
